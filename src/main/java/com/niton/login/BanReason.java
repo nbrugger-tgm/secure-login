@@ -1,0 +1,8 @@
+package com.niton.login;
+
+public enum BanReason {
+	ACCESSED_TO_MANY_ACCOUNTS,
+	RAPID_GUESSING,
+	TRY_LIMIT_EXCEEDED,
+	GUESS_ON_WARNED_ACCOUNT;
+}
