@@ -1,17 +1,17 @@
 package com.niton.login;
 
 public interface LoginListener {
-	public void banIP(String ip,BanReason reason);
-	public void ipAccessAccountLogin(String ip,String account);
-	public void loginFail(String ip,String account);
-	public void guessInCooldown(String ip,String account);
-	public void loginSuccess(String ip,String account);
-	public void loginTry(String ip,String account);
-	public void exceedBasicTries(String ip,String account);
-	public void guessInWaitingArea(String ip,String account);
-	public void alertAccount(String account,AccountAlertReason reason);
-	public void bannedIPRequest(String ip);
-	public static abstract class AlertListener implements LoginListener{
+	void banIP(String ip, BanReason reason);
+	void ipAccessAccountLogin(String ip, String account);
+	void loginFail(String ip, String account);
+	void guessInCooldown(String ip,String account);
+	void loginSuccess(String ip,String account);
+	void loginTry(String ip,String account);
+	void exceedBasicTries(String ip,String account);
+	void guessInWaitingArea(String ip,String account);
+	void alertAccount(String account,AccountAlertReason reason);
+	void bannedIPRequest(String ip);
+	abstract class AlertListener implements LoginListener{
 
 		@Override
 		public void ipAccessAccountLogin(String ip, String account) {
