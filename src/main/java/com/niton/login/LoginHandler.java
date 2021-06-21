@@ -3,26 +3,31 @@ package com.niton.login;
 import com.niton.login.cfg.LoginSecurityConfig;
 import com.typesafe.config.ConfigFactory;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 
 public class LoginHandler<PT> implements LoginListener {
 	// Account related
-	private HashMap<String, Integer> accountTries = new HashMap<>();
-	private Set<String> warned = new HashSet<>();
-	private HashMap<String, Set<String>> waitingArea = new HashMap<>();
-	private HashMap<String, Long> accLastRequest = new HashMap<>();
-	private HashMap<String, Set<String>> accountAccessingIPs = new HashMap<>();
+	private final HashMap<String, Integer> accountTries = new HashMap<>();
+	private final Set<String>              warned       = new HashSet<>();
+	private final HashMap<String, Set<String>> waitingArea         = new HashMap<>();
+	private final HashMap<String, Long>        accLastRequest      = new HashMap<>();
+	private final HashMap<String, Set<String>> accountAccessingIPs = new HashMap<>();
 
 	//IP related
-	private HashMap<String, Integer> ipTries = new HashMap<>();
-	private Set<String> blocked = new HashSet<>();
-	private HashMap<String, Long> banEnteringDates = new HashMap<>();
-	private HashMap<String, Long> ipLastRequest = new HashMap<>();
-	private HashMap<String, HashMap<String, Long>> waitingAreaEnterTime = new HashMap<>();
-	private HashMap<String, HashMap<String, Integer>> legidGuessCounter = new HashMap<>();
-	private HashMap<String, Set<String>> ipsAccountAccessing = new HashMap<>();
+	private final HashMap<String, Integer> ipTries = new HashMap<>();
+	private final Set<String>              blocked = new HashSet<>();
+	private final HashMap<String, Long>                     banEnteringDates     = new HashMap<>();
+	private final HashMap<String, Long>                     ipLastRequest        = new HashMap<>();
+	private final HashMap<String, HashMap<String, Long>>    waitingAreaEnterTime = new HashMap<>();
+	private final HashMap<String, HashMap<String, Integer>> legidGuessCounter    = new HashMap<>();
+	/**
+	 * Stores the account each ip accessed {@code <ip, accessedAccounts>}
+	 */
+	private final HashMap<String, Set<String>>              ipsAccountAccessing  = new HashMap<>();
 
 	private LoginSecurityConfig config;
 	private Authenticator<PT> auther;
@@ -49,7 +54,7 @@ public class LoginHandler<PT> implements LoginListener {
 		}
 	};
 
-	public LoginResult res;
+	private LoginResult res;
 
 	public LoginHandler(LoginSecurityConfig config, Authenticator<PT> auther) {
 		this.config = config;
@@ -66,15 +71,22 @@ public class LoginHandler<PT> implements LoginListener {
 		if (res != null)
 			return res;
 
-
-		if (Timing.isOver(waitingAreaEnterTime.getOrDefault(account, new HashMap<>()).getOrDefault(ip, 0L), config.security.login.waiting_area_time * 60 * 1000)) {
+		long waitingAreaMS = Duration.ofMinutes(config.security.login.waiting_area_time).toMillis();
+		long waitinAreaEnterTime = waitingAreaEnterTime.getOrDefault(account, new HashMap<>()).getOrDefault(ip, 0L);
+		if (Timing.isOver(waitinAreaEnterTime, waitingAreaMS)) {
 			waitingArea.getOrDefault(account, new HashSet<>()).remove(ip);
 		} else {
 			guessInWaitingArea(ip, account);
 			return res;
 		}
 
-		if (!Timing.isOver(ipLastRequest.getOrDefault(ip,0L), (long) (config.security.login.login_delay * 1000)) || !Timing.isOver(accLastRequest.getOrDefault(account,0L), (long) (config.security.login.login_delay * 1000))) {
+		long lastIPRequest = ipLastRequest.getOrDefault(ip,0L);
+		long lastAccRequest = accLastRequest.getOrDefault(account,0L);
+		long delayMS = (long) (config.security.login.login_delay * 1000);
+		boolean isIpEligibleForRequest = Timing.isOver(lastIPRequest, delayMS);
+		boolean isAccEligibleForRequest = Timing.isOver(lastAccRequest, delayMS);
+
+		if (!isIpEligibleForRequest || !isAccEligibleForRequest) {
 			guessInCooldown(ip, account);
 			return res;
 		}
@@ -122,7 +134,6 @@ public class LoginHandler<PT> implements LoginListener {
 		ipTries.remove(ip);
 		ipLastRequest.remove(ip);
 		res = LoginResult.BLOCKED;
-		return;
 	}
 
 	@Override
@@ -173,7 +184,8 @@ public class LoginHandler<PT> implements LoginListener {
 	public void loginTry(String ip, String account) {
 		listener.loginTry(ip, account);
 		if (blocked.contains(ip)) {
-			if (Timing.isOver(banEnteringDates.get(ip), config.security.perma_duration * 60 * 60 * 1000)) {
+			long msDur = Duration.ofHours(config.security.perma_duration).get(ChronoUnit.MILLIS);
+			if (Timing.isOver(banEnteringDates.get(ip), msDur)) {
 				blocked.remove(ip);
 				banEnteringDates.remove(ip);
 			} else {
