@@ -9,7 +9,14 @@ public interface LoginListener {
 	void loginTry(String ip,String account);
 	void exceedBasicTries(String ip,String account);
 	void guessInWaitingArea(String ip,String account);
-	void alertAccount(String account,AccountAlertReason reason);
+
+	/**
+	 * Called when an account goes to alert mode
+	 * @param account the key of the account under alert
+	 * @param ip the ip that triggered the alert
+	 * @param reason the reason for the alert
+	 */
+	void alertAccount(String account, String ip, AccountAlertReason reason);
 	void bannedIPRequest(String ip);
 	abstract class AlertListener implements LoginListener{
 

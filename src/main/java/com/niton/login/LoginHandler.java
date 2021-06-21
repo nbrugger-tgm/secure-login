@@ -50,7 +50,7 @@ public class LoginHandler<PT> implements LoginListener {
 		}
 
 		@Override
-		public void alertAccount(String account, AccountAlertReason reason) {
+		public void alertAccount(String account, String ip, AccountAlertReason reason) {
 		}
 	};
 
@@ -126,7 +126,7 @@ public class LoginHandler<PT> implements LoginListener {
 	public void banIP(String ip, BanReason reason) {
 		listener.banIP(ip, reason);
 		for (String account : ipsAccountAccessing.getOrDefault(ip, new HashSet<>())) {
-			alertAccount(account, AccountAlertReason.BANNED_IP_GUESSED);
+			alertAccount(account, ip, AccountAlertReason.BANNED_IP_GUESSED);
 		}
 		blocked.add(ip);
 		banEnteringDates.put(ip, System.currentTimeMillis());
@@ -152,7 +152,7 @@ public class LoginHandler<PT> implements LoginListener {
 			banIP(ip, BanReason.ACCESSED_TO_MANY_ACCOUNTS);
 
 		if (accountAccessingIPs.size() > config.security.login.max_ips_per_account)
-			alertAccount(account, AccountAlertReason.TO_MANY_IPS_ACCESSING);
+			alertAccount(account, ip, AccountAlertReason.TO_MANY_IPS_ACCESSING);
 	}
 
 	@Override
@@ -194,12 +194,12 @@ public class LoginHandler<PT> implements LoginListener {
 			}
 		}
 		ipTries.put(ip, ipTries.getOrDefault(ip,0) + 1);
-		accountTries.put(account, accountTries.getOrDefault(accountTries,0) + 1);
+		accountTries.put(account, accountTries.getOrDefault(account,0) + 1);
 		if (ipTries.get(ip) >= config.security.login.max_ip_tries) {
 			banIP(ip, BanReason.TRY_LIMIT_EXCEEDED);
 		}
 		if (accountTries.get(account) >= config.security.login.max_acc_tries) {
-			alertAccount(account, AccountAlertReason.MAX_TRIES_EXCEED);
+			alertAccount(account,ip, AccountAlertReason.MAX_TRIES_EXCEED);
 		}
 	}
 
@@ -217,7 +217,7 @@ public class LoginHandler<PT> implements LoginListener {
 		waitingAreaEnterTime.put(account, thiAccountWaitingEnterTimes);
 
 		if (thisAccountWaintingArea.size() > config.security.login.waiting_area_stop) {
-			alertAccount(account, AccountAlertReason.WAITING_AREA_FULL);
+			alertAccount(account, ip, AccountAlertReason.WAITING_AREA_FULL);
 		}
 	}
 
@@ -228,8 +228,8 @@ public class LoginHandler<PT> implements LoginListener {
 	}
 
 	@Override
-	public void alertAccount(String account, AccountAlertReason reason) {
-		listener.alertAccount(account, reason);
+	public void alertAccount(String account, String ip, AccountAlertReason reason) {
+		listener.alertAccount(account, ip, reason);
 		warned.add(account);
 	}
 
