@@ -8,4 +8,5 @@ The process of the login handling is visualized here as it is kind of complex
 > The lower part of the image visualizes "listeners"
 
 Here is the matching legend
+
 ![](login-security-legend.png)

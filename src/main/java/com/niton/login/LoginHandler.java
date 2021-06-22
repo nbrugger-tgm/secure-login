@@ -29,8 +29,8 @@ public class LoginHandler<PT> implements LoginListener {
 	 */
 	private final HashMap<String, Set<String>>              ipsAccountAccessing  = new HashMap<>();
 
-	private LoginSecurityConfig config;
-	private Authenticator<PT> auther;
+	private final LoginSecurityConfig config;
+	private final Authenticator<PT>   auther;
 
 	public LoginListener getListener() {
 		return listener;
@@ -102,7 +102,7 @@ public class LoginHandler<PT> implements LoginListener {
 		//messing with database by timing determinition
 		try {
 			Thread.sleep((long) (Math.random() * 100));
-		} catch (InterruptedException e) {
+		} catch (InterruptedException ignored) {
 		}
 		boolean valid = auther.authenticate(account, password);
 		if (valid) {
@@ -116,7 +116,7 @@ public class LoginHandler<PT> implements LoginListener {
 			return LoginResult.VERIFIED;
 		} else {
 			loginFail(ip, account);
-			if (thisAccountLegidCount.getOrDefault(ip, 0) > config.security.login.tries_bevore_waiting)
+			if (thisAccountLegidCount.get(ip) > config.security.login.tries_bevore_waiting)
 				exceedBasicTries(ip, account);
 			return LoginResult.UNSUCCESSFULL;
 		}
@@ -151,7 +151,7 @@ public class LoginHandler<PT> implements LoginListener {
 		if (accountsForThisIp.size() > config.security.login.max_accounts_per_ip)
 			banIP(ip, BanReason.ACCESSED_TO_MANY_ACCOUNTS);
 
-		if (accountAccessingIPs.size() > config.security.login.max_ips_per_account)
+		if (ipsForThisAccount.size() > config.security.login.max_ips_per_account)
 			alertAccount(account, ip, AccountAlertReason.TO_MANY_IPS_ACCESSING);
 	}
 
