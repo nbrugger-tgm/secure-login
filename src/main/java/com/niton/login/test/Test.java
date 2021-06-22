@@ -52,7 +52,7 @@ public class Test {
 			}
 
 			@Override
-			public void alertAccount(String account, AccountAlertReason reason) {
+			public void alertAccount(String account, String ip, AccountAlertReason reason) {
 				System.out.println("Test.alertAccount");
 			}
 
