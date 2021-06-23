@@ -5,29 +5,30 @@ import com.typesafe.config.ConfigFactory;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
+
+import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptySet;
 
 public class LoginHandler<PT> implements LoginListener {
 	// Account related
-	private final HashMap<String, Integer> accountTries = new HashMap<>();
+	private final Map<String, Integer> accountTries = new HashMap<>();
 	private final Set<String>              warned       = new HashSet<>();
-	private final HashMap<String, Set<String>> waitingArea         = new HashMap<>();
-	private final HashMap<String, Long>        accLastRequest      = new HashMap<>();
-	private final HashMap<String, Set<String>> accountAccessingIPs = new HashMap<>();
+	private final Map<String, Long>        accLastRequest      = new HashMap<>();
+	private final Map<String, Set<String>> accountAccessingIPs = new HashMap<>();
 
 	//IP related
-	private final HashMap<String, Integer> ipTries = new HashMap<>();
-	private final Set<String>              blocked = new HashSet<>();
-	private final HashMap<String, Long>                     banEnteringDates     = new HashMap<>();
-	private final HashMap<String, Long>                     ipLastRequest        = new HashMap<>();
-	private final HashMap<String, HashMap<String, Long>>    waitingAreaEnterTime = new HashMap<>();
-	private final HashMap<String, HashMap<String, Integer>> legidGuessCounter    = new HashMap<>();
+	private final Set<String> waitingArea         = new HashSet<>();
+	private final Map<String, Integer>              ipTries              = new HashMap<>();
+	private final Set<String>                           blocked          = new HashSet<>();
+	private final Map<String, Long>                 banEnteringDates     = new HashMap<>();
+	private final Map<String, Long>                 ipLastRequest        = new HashMap<>();
+	private final Map<String, Long>    waitingAreaEnterTime = new HashMap<>();
+	private final Map<String, Map<String, Integer>> legidGuessCounter    = new HashMap<>();
 	/**
 	 * Stores the account each ip accessed {@code <ip, accessedAccounts>}
 	 */
-	private final HashMap<String, Set<String>>              ipsAccountAccessing  = new HashMap<>();
+	private final Map<String, Set<String>>          ipsAccountAccessing  = new HashMap<>();
 
 	private final LoginSecurityConfig config;
 	private final Authenticator<PT>   auther;
@@ -67,56 +68,63 @@ public class LoginHandler<PT> implements LoginListener {
 
 	public LoginResult handle(String account, PT password, String ip) {
 		res = null;
-		loginTry(ip, account);
-		if (res != null)
+		loginTry(ip, account); //sets res to BANNED or null
+		if (res != null)//-> banned IP
 			return res;
 
+		//person isnt banned
+
+
+
+
 		long waitingAreaMS = Duration.ofMinutes(config.security.login.waiting_area_time).toMillis();
-		long waitinAreaEnterTime = waitingAreaEnterTime.getOrDefault(account, new HashMap<>()).getOrDefault(ip, 0L);
+		long waitinAreaEnterTime = waitingAreaEnterTime.getOrDefault(ip,0L);
 		if (Timing.isOver(waitinAreaEnterTime, waitingAreaMS)) {
-			waitingArea.getOrDefault(account, new HashSet<>()).remove(ip);
+			waitingArea.remove(ip);
 		} else {
 			guessInWaitingArea(ip, account);
 			return res;
 		}
 
+		//check if there is a cooldown violation
 		long lastIPRequest = ipLastRequest.getOrDefault(ip,0L);
 		long lastAccRequest = accLastRequest.getOrDefault(account,0L);
 		long delayMS = (long) (config.security.login.login_delay * 1000);
 		boolean isIpEligibleForRequest = Timing.isOver(lastIPRequest, delayMS);
 		boolean isAccEligibleForRequest = Timing.isOver(lastAccRequest, delayMS);
 
+		//the request is counted, no matter if the ip is on cooldown or not
+		legidGuessCounter.getOrDefault(account, emptyMap()).put(ip,legidGuessCounter.getOrDefault(account, emptyMap()).getOrDefault(ip,0 )+1);
+		ipLastRequest.put(ip, System.currentTimeMillis());
+		accLastRequest.put(account, System.currentTimeMillis());
+
 		if (!isIpEligibleForRequest || !isAccEligibleForRequest) {
-			guessInCooldown(ip, account);
+			guessInCooldown(ip, account);//changes res to ON_COOLDOWN or BANNED
 			return res;
 		}
+		//the ip is allowed to do a request at the moment
 
-		HashMap<String, Integer> thisAccountLegidCount = legidGuessCounter.getOrDefault(account, new HashMap<>());
-		thisAccountLegidCount.put(ip, thisAccountLegidCount.getOrDefault(ip, 0) + 1);
-		legidGuessCounter.put(account, thisAccountLegidCount);
+		Map<String, Integer> thisAccountLegitCount = legidGuessCounter.getOrDefault(account, emptyMap());
+		thisAccountLegitCount.put(ip, thisAccountLegitCount.getOrDefault(ip, 0) + 1);
+		legidGuessCounter.put(account, thisAccountLegitCount);
 
 		ipAccessAccountLogin(ip, account);
+
 		if (res != null)
 			return res;
 
 		//messing with database by timing determinition
 		try {
-			Thread.sleep((long) (Math.random() * 100));
+			Thread.sleep((long) (10+Math.random() * 40));
 		} catch (InterruptedException ignored) {
 		}
 		boolean valid = auther.authenticate(account, password);
 		if (valid) {
-			ipsAccountAccessing.getOrDefault(ip, new HashSet<>()).remove(account);
-			accountAccessingIPs.getOrDefault(account, new HashSet<>()).remove(ip);
-			this.legidGuessCounter.getOrDefault(account, new HashMap<>()).remove(ip);
-			this.warned.remove(account);
-			this.waitingArea.getOrDefault(account, new HashSet<>()).remove(ip);
-			this.ipTries.remove(ip);
 			loginSuccess(ip, account);
 			return LoginResult.VERIFIED;
 		} else {
 			loginFail(ip, account);
-			if (thisAccountLegidCount.get(ip) > config.security.login.tries_bevore_waiting)
+			if (thisAccountLegitCount.get(ip) > config.security.login.tries_bevore_waiting)
 				exceedBasicTries(ip, account);
 			return LoginResult.UNSUCCESSFULL;
 		}
@@ -125,8 +133,9 @@ public class LoginHandler<PT> implements LoginListener {
 	@Override
 	public void banIP(String ip, BanReason reason) {
 		listener.banIP(ip, reason);
-		for (String account : ipsAccountAccessing.getOrDefault(ip, new HashSet<>())) {
-			alertAccount(account, ip, AccountAlertReason.BANNED_IP_GUESSED);
+		for (String account : ipsAccountAccessing.getOrDefault(ip, emptySet())) {
+			if(!warned.contains(account))
+				alertAccount(account, ip, AccountAlertReason.BANNED_IP_GUESSED);
 		}
 		blocked.add(ip);
 		banEnteringDates.put(ip, System.currentTimeMillis());
@@ -139,11 +148,12 @@ public class LoginHandler<PT> implements LoginListener {
 	@Override
 	public void ipAccessAccountLogin(String ip, String account) {
 		listener.ipAccessAccountLogin(ip, account);
-		Set<String> ipsForThisAccount = accountAccessingIPs.getOrDefault(account, new HashSet<>());
+
+		Set<String> ipsForThisAccount = accountAccessingIPs.getOrDefault(account, emptySet());
 		ipsForThisAccount.add(ip);
 		accountAccessingIPs.put(account, ipsForThisAccount);
 
-		Set<String> accountsForThisIp = ipsAccountAccessing.getOrDefault(ip, new HashSet<>());
+		Set<String> accountsForThisIp = ipsAccountAccessing.getOrDefault(ip, emptySet());
 		accountsForThisIp.add(account);
 		ipsAccountAccessing.put(account, accountsForThisIp);
 
@@ -152,15 +162,13 @@ public class LoginHandler<PT> implements LoginListener {
 			banIP(ip, BanReason.ACCESSED_TO_MANY_ACCOUNTS);
 
 		if (ipsForThisAccount.size() > config.security.login.max_ips_per_account)
-			alertAccount(account, ip, AccountAlertReason.TO_MANY_IPS_ACCESSING);
+			if(!warned.contains(account))
+				alertAccount(account, ip, AccountAlertReason.TO_MANY_IPS_ACCESSING);
 	}
 
 	@Override
 	public void loginFail(String ip, String account) {
 		listener.loginFail(ip, account);
-
-		ipLastRequest.put(ip, System.currentTimeMillis());
-		accLastRequest.put(account, System.currentTimeMillis());
 	}
 
 	@Override
@@ -168,15 +176,18 @@ public class LoginHandler<PT> implements LoginListener {
 		listener.guessInCooldown(ip, account);
 		if (warned.contains(account))
 			banIP(ip, BanReason.GUESS_ON_WARNED_ACCOUNT);
-		ipLastRequest.put(ip, System.currentTimeMillis());
-		legidGuessCounter.getOrDefault(account, new HashMap<>()).put(ip,legidGuessCounter.getOrDefault(account, new HashMap<>()).getOrDefault(ip,0 )+1);
-		accLastRequest.put(account, System.currentTimeMillis());
-		if (res == null)
+		if (res == null)//could be banned too
 			res = LoginResult.ON_COOLDOWN;
 	}
 
 	@Override
 	public void loginSuccess(String ip, String account) {
+		ipsAccountAccessing.remove(ip);
+		accountAccessingIPs.getOrDefault(account, Collections.emptySet()).remove(ip);
+		this.legidGuessCounter.getOrDefault(account, emptyMap()).remove(ip);
+		this.warned.remove(account);
+		this.waitingArea.remove(ip);
+		this.ipTries.remove(ip);
 		listener.loginSuccess(ip, account);
 	}
 
@@ -199,25 +210,22 @@ public class LoginHandler<PT> implements LoginListener {
 			banIP(ip, BanReason.TRY_LIMIT_EXCEEDED);
 		}
 		if (accountTries.get(account) >= config.security.login.max_acc_tries) {
-			alertAccount(account,ip, AccountAlertReason.MAX_TRIES_EXCEED);
+			if(!warned.contains(account))
+				alertAccount(account,ip, AccountAlertReason.MAX_TRIES_EXCEED);
 		}
 	}
 
 	@Override
 	public void exceedBasicTries(String ip, String account) {
 		listener.exceedBasicTries(ip, account);
-		legidGuessCounter.getOrDefault(account, new HashMap<>()).remove(ip);
+		legidGuessCounter.getOrDefault(account, emptyMap()).remove(ip);
 
-		Set<String> thisAccountWaintingArea = waitingArea.getOrDefault(account, new HashSet<>());
-		thisAccountWaintingArea.add(ip);
-		waitingArea.put(account, thisAccountWaintingArea);
+		waitingArea.add(ip);
+		waitingAreaEnterTime.put(ip, System.currentTimeMillis());
 
-		HashMap<String, Long> thiAccountWaitingEnterTimes = waitingAreaEnterTime.getOrDefault(ip, new HashMap<>());
-		thiAccountWaitingEnterTimes.put(ip, System.currentTimeMillis());
-		waitingAreaEnterTime.put(account, thiAccountWaitingEnterTimes);
-
-		if (thisAccountWaintingArea.size() > config.security.login.waiting_area_stop) {
-			alertAccount(account, ip, AccountAlertReason.WAITING_AREA_FULL);
+		if (waitingArea.size() > config.security.login.waiting_area_stop) {
+			for(String areaIP : waitingArea)
+				alertAccount(account, areaIP, AccountAlertReason.WAITING_AREA_FULL);
 		}
 	}
 
