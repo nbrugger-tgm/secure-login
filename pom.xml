@@ -13,7 +13,7 @@ maven-v4_0_0.xsd">
         <java.version>1.8</java.version>
         <app.name>login-secure</app.name>
         <app.artifact>login-secure</app.artifact>
-        <app.version>1.1</app.version>
+        <app.version>1.1.2</app.version>
         <build.starter></build.starter>
         <git.user>nbrugger-tgm</git.user>
         <git.repo>login-secure</git.repo>

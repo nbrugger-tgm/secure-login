@@ -94,7 +94,7 @@ public class LoginHandler<PT> implements LoginListener {
 		boolean isAccEligibleForRequest = Timing.isOver(lastAccRequest, delayMS);
 
 		//the request is counted, no matter if the ip is on cooldown or not
-		legidGuessCounter.getOrDefault(account, emptyMap()).put(ip,legidGuessCounter.getOrDefault(account, emptyMap()).getOrDefault(ip,0 )+1);
+		legidGuessCounter.getOrDefault(account, new HashMap<>()).put(ip,legidGuessCounter.getOrDefault(account, new HashMap<>()).getOrDefault(ip,0 )+1);
 		ipLastRequest.put(ip, System.currentTimeMillis());
 		accLastRequest.put(account, System.currentTimeMillis());
 
@@ -104,7 +104,7 @@ public class LoginHandler<PT> implements LoginListener {
 		}
 		//the ip is allowed to do a request at the moment
 
-		Map<String, Integer> thisAccountLegitCount = legidGuessCounter.getOrDefault(account, emptyMap());
+		Map<String, Integer> thisAccountLegitCount = legidGuessCounter.getOrDefault(account, new HashMap<>());
 		thisAccountLegitCount.put(ip, thisAccountLegitCount.getOrDefault(ip, 0) + 1);
 		legidGuessCounter.put(account, thisAccountLegitCount);
 
@@ -133,7 +133,7 @@ public class LoginHandler<PT> implements LoginListener {
 	@Override
 	public void banIP(String ip, BanReason reason) {
 		listener.banIP(ip, reason);
-		for (String account : ipsAccountAccessing.getOrDefault(ip, emptySet())) {
+		for (String account : ipsAccountAccessing.getOrDefault(ip, new HashSet<>())) {
 			if(!warned.contains(account))
 				alertAccount(account, ip, AccountAlertReason.BANNED_IP_GUESSED);
 		}
@@ -149,11 +149,11 @@ public class LoginHandler<PT> implements LoginListener {
 	public void ipAccessAccountLogin(String ip, String account) {
 		listener.ipAccessAccountLogin(ip, account);
 
-		Set<String> ipsForThisAccount = accountAccessingIPs.getOrDefault(account, emptySet());
+		Set<String> ipsForThisAccount = accountAccessingIPs.getOrDefault(account, new HashSet<>());
 		ipsForThisAccount.add(ip);
 		accountAccessingIPs.put(account, ipsForThisAccount);
 
-		Set<String> accountsForThisIp = ipsAccountAccessing.getOrDefault(ip, emptySet());
+		Set<String> accountsForThisIp = ipsAccountAccessing.getOrDefault(ip, new HashSet<>());
 		accountsForThisIp.add(account);
 		ipsAccountAccessing.put(account, accountsForThisIp);
 
@@ -183,8 +183,8 @@ public class LoginHandler<PT> implements LoginListener {
 	@Override
 	public void loginSuccess(String ip, String account) {
 		ipsAccountAccessing.remove(ip);
-		accountAccessingIPs.getOrDefault(account, Collections.emptySet()).remove(ip);
-		this.legidGuessCounter.getOrDefault(account, emptyMap()).remove(ip);
+		accountAccessingIPs.getOrDefault(account, new HashSet<>()).remove(ip);
+		this.legidGuessCounter.getOrDefault(account, new HashMap<>()).remove(ip);
 		this.warned.remove(account);
 		this.waitingArea.remove(ip);
 		this.ipTries.remove(ip);
@@ -218,7 +218,7 @@ public class LoginHandler<PT> implements LoginListener {
 	@Override
 	public void exceedBasicTries(String ip, String account) {
 		listener.exceedBasicTries(ip, account);
-		legidGuessCounter.getOrDefault(account, emptyMap()).remove(ip);
+		legidGuessCounter.getOrDefault(account, new HashMap<>()).remove(ip);
 
 		waitingArea.add(ip);
 		waitingAreaEnterTime.put(ip, System.currentTimeMillis());
