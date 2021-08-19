@@ -195,7 +195,7 @@ public class LoginHandler<PT> implements LoginListener {
 	public void loginTry(String ip, String account) {
 		listener.loginTry(ip, account);
 		if (blocked.contains(ip)) {
-			long msDur = Duration.ofHours(config.security.perma_duration).get(ChronoUnit.MILLIS);
+			long msDur = Duration.ofHours(config.security.perma_duration).toMillis();
 			if (Timing.isOver(banEnteringDates.get(ip), msDur)) {
 				blocked.remove(ip);
 				banEnteringDates.remove(ip);
